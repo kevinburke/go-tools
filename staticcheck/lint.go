@@ -153,6 +153,8 @@ func (c *Checker) Funcs() map[string]lint.Func {
 		// "SA5006": c.CheckSliceOutOfBounds,
 		"SA5007": c.CheckInfiniteRecursion,
 
+		"SA6000": c.CheckRegexpMatchLoop,
+
 		"SA9000": c.CheckDubiousSyncPoolPointers,
 		"SA9001": c.CheckDubiousDeferInChannelRangeLoop,
 		"SA9002": c.CheckNonOctalFileMode,
@@ -2574,7 +2576,7 @@ var checkMathIntRules = map[string]CallCheck{
 func pointlessIntMath(call *Call) {
 	if ConvertedFromInt(call.Args[0].Value) {
 		// TODO factor out the following line into a function
-		name := call.Common.StaticCallee().Object().(*types.Func).FullName()
+		name := call.Instr.Common().StaticCallee().Object().(*types.Func).FullName()
 		call.Invalid(fmt.Sprintf("calling %s on a converted integer is pointless", name))
 	}
 }
@@ -2774,7 +2776,7 @@ func (c *Checker) checkCalls(f *lint.File, rules map[string]CallCheck) {
 					args = append(args, &Argument{Value: Value{arg, vr}})
 				}
 				call := &Call{
-					Common:  ssacall.Common(),
+					Instr:   ssacall,
 					Args:    args,
 					Checker: c,
 					Parent:  ssacall.Parent(),
@@ -2794,7 +2796,7 @@ func (c *Checker) checkCalls(f *lint.File, rules map[string]CallCheck) {
 					}
 				}
 				for _, e := range call.invalids {
-					f.Errorf(call.Common, "%s", e)
+					f.Errorf(call.Instr, "%s", e)
 				}
 			}
 		}
@@ -2828,4 +2830,34 @@ var checkBytesEqualIPRules = map[string]CallCheck{
 
 func (c *Checker) CheckBytesEqualIP(f *lint.File) {
 	c.checkCalls(f, checkBytesEqualIPRules)
+}
+
+var checkRegexpMatchLoopRules = map[string]CallCheck{
+	"regexp.Match":       loopedRegexp("regexp.Match"),
+	"regexp.MatchReader": loopedRegexp("regexp.MatchReader"),
+	"regexp.MatchString": loopedRegexp("regexp.MatchString"),
+}
+
+func (c *Checker) CheckRegexpMatchLoop(f *lint.File) {
+	c.checkCalls(f, checkRegexpMatchLoopRules)
+}
+
+func loopedRegexp(name string) CallCheck {
+	return func(call *Call) {
+		if len(extractConsts(call.Args[0].Value.Value)) == 0 {
+			return
+		}
+		loops := findLoops(call.Parent)
+		found := false
+		for _, loop := range loops {
+			if loop[call.Instr.Block()] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return
+		}
+		call.Invalid(fmt.Sprintf("calling %s in a loop has poor performance, consider using regexp.Compile", name))
+	}
 }
