@@ -1,3 +1,17 @@
+This fork uploads releases tagged with the current day.
+
+To generate a new release, run
+
+```
+GITHUB_TOKEN=$(cat ~/cfg/github_release_token) make release version=$(date +%Y-%m-%d)
+```
+
+Then download it with e.g.
+
+```
+curl --silent --location --output $(MEGACHECK) https://github.com/kevinburke/go-tools/releases/download/2017-10-04/megacheck-darwin-amd64
+```
+
 # honnef.co/go/tools
 
 `honnef.co/go/tools/...` is a collection of tools and libraries for
