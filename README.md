@@ -1,3 +1,11 @@
+This fork uploads releases tagged with the current day.
+
+To generate a new release, run
+
+```
+GITHUB_TOKEN=$(cat ~/cfg/github_release_token) make release version=$(date +%Y-%m-%d)
+```
+
 # honnef.co/go/tools
 
 `honnef.co/go/tools/...` is a collection of tools and libraries for
